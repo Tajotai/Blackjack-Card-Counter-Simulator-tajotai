@@ -1,4 +1,8 @@
 import random
+import pandas as pd
+
+running_count = 0
+true_count = 0
 
 def check_ace(hand): 
     """
@@ -67,7 +71,47 @@ def play_again():
         else:
             print("Yes or no? ")
             continue
-            
+
+def update_count(hand, deck, number=1, print=False):
+    global running_count, true_count
+    running_count += card_counter(hand[-number:])
+    true_count = true_counter(deck, running_count)
+    if print:
+        print_count(true_count, running_count)
+    return running_count, true_count
+
+def bust_check(hand, total):
+    if total > 21:
+        # Checking for an ace in the player hand
+        if check_ace(hand):
+            total = hand_total(hand)
+            bust_check(hand, total)
+        else:
+            return True
+    else:
+        return False
+
+def do_hit(hand, deck, dealer=False):
+    deal_card(hand, deck)
+    total = hand_total(hand)
+
+    # Counter
+    r_count, true_cnt = update_count(hand, deck, print=True)
+
+    # Checking if the player busts
+    if bust_check(hand, total):
+        if dealer:
+            dealer_print(hand, total)
+        else:
+            player_print(hand, total)
+        return True, total
+    else:
+        if dealer:
+            dealer_print(hand, total)
+        else:
+            player_print(hand, total)
+        return False, total
+
 def dealer_turn(your_hand, dealer_hand, total, dtotal, r_count, true_cnt, deck, turn=True): 
     """
     Activates the dealer's turn if player's move was 'stay'
@@ -94,32 +138,17 @@ def dealer_turn(your_hand, dealer_hand, total, dtotal, r_count, true_cnt, deck, 
         while dtotal <= 16: 
             
             # Dealing cards to the dealer if they have less than or equal to 16
-            deal_card(dealer_hand, deck)
-            dtotal = hand_total(dealer_hand)
-            dealer_print(dealer_hand, dtotal)
-            
-            # Counter
-            r_count += card_counter(dealer_hand[-1:])
-            true_cnt = true_counter(deck, r_count)
-            print_count(true_cnt, r_count)
-            
-        # Checking if the dealer wins
-        if dtotal == 21: 
-            print("Game Over. House wins.")
-            loss += 1
-            break
-        
-        # Checking if the dealer busts
-        elif dtotal > 21: 
-            if check_ace(dealer_hand):
-                continue
-            else:
+            bust, dtotal = do_hit(dealer_hand, deck, dealer=True)
+            if bust:
                 print("Dealer busts! You win!")
                 wins += 1
                 break
+
+        if dtotal > 21:
+            break
                 
         # Comparing dealer hand to player hand
-        elif 17 <= dtotal <= 21: 
+        if 17 <= dtotal <= 21:
             if dtotal > total:
                 print("Game Over. House wins")
                 loss += 1
@@ -136,9 +165,8 @@ def dealer_turn(your_hand, dealer_hand, total, dtotal, r_count, true_cnt, deck, 
                 print("House busts. You win!")
                 wins += 1
                 break
-    return [wins, loss, draw, r_count, true_cnt]
+    return [wins, loss, draw]
 
-import pandas as pd
 
 def card_counter(hand, strategy='Hi-Lo'):
     """
@@ -184,22 +212,19 @@ def blackjack(deck, r_count, true_cnt):
     loss = 0
     
     # Card Counting
-    r_count  += card_counter(your_hand) + card_counter(dealer_hand[:1])
-    true_cnt  = true_counter(deck, r_count)
-    print_count(true_cnt, r_count) 
+    update_count(your_hand, deck, number=2, print=True)
+    update_count(dealer_hand[:1], deck, print=True)
     
     # Looping through the moves
     while len(deck) > 1:
         print('Remaining cards: ', len(deck), '\n')
         
         # Checking if the player has a natural blackjack
-        if hand_total(your_hand) == 21 and hand_total(dealer_hand) < 21:
+        if hand_total(your_hand) == 21 and len(your_hand) == 2 and hand_total(dealer_hand) < 21:
             dealer_print(dealer_hand, hand_total(dealer_hand))
             
             # Counter
-            r_count += card_counter(dealer_hand[-1:])
-            true_cnt = true_counter(deck, r_count)
-            print_count(true_cnt, r_count)
+            update_count(your_hand, deck, print=True)
             
             print("Congratulations! Blackjack!")
             wins += 1
@@ -210,9 +235,7 @@ def blackjack(deck, r_count, true_cnt):
             dealer_print(dealer_hand, hand_total(dealer_hand))
             
             # Counter
-            r_count += card_counter(dealer_hand[-1:])
-            true_cnt = true_counter(deck, r_count)
-            print_count(true_cnt, r_count)
+            update_count(your_hand, deck, print=True)
             
             print("It's a draw. Bet is returned.")
             draw += 1
@@ -222,49 +245,18 @@ def blackjack(deck, r_count, true_cnt):
         move = input("Hit or stay? ").lower()
         
         if move == "hit" or move == "h":
-            deal_card(your_hand, deck)
-            total = hand_total(your_hand)
-            
-            # Counter
-            r_count += card_counter(your_hand[-1:])
-            true_cnt = true_counter(deck, r_count)
-            print_count(true_cnt, r_count)
-            
-            # Checking if the player busts
-            if  total > 21:              
-                
-                # Checking for an ace in the player hand
-                if check_ace(your_hand): 
-                    total = hand_total(your_hand)
-                    player_print(your_hand, total)
-                    continue
-                    
-                # Otherwise they bust
-                else:                    
-                    player_print(your_hand, total)
-                    print("Dealer wins. You lose.")
-                    loss += 1
-                    break
-            
-            elif total < 21:             
+            bust, total = do_hit(your_hand, deck)
+            if bust:
                 player_print(your_hand, total)
-                
-                # Going back to asking the player for a move
-                continue
-                
-            # Checking if the player succeeded in achieving blackjack
-            elif total == 21:            
-                player_print(your_hand, total)
-                print("Blackjack! You win!")
-                wins += 1
+                print("Dealer wins. You lose.")
+                loss += 1
                 break
         elif move == "stay" or move == "s":
-            total  = hand_total(your_hand)
+            total = hand_total(your_hand)
             dtotal = hand_total(dealer_hand)
             
             # Counter
-            r_count += card_counter(dealer_hand[-1:])
-            true_cnt = true_counter(deck, r_count)
+            update_count(dealer_hand, deck, print=True)
             
             # Running the function for the dealer's turn
             result = dealer_turn(your_hand, dealer_hand, total, dtotal, r_count, true_cnt, deck)
@@ -273,11 +265,6 @@ def blackjack(deck, r_count, true_cnt):
             wins += result[0]
             loss += result[1]
             draw += result[2]
-            
-            # Counter 
-            r_count  = result[3]
-            true_cnt = result[4]
-            print_count(true_cnt, r_count)
             break
                 
         else:
@@ -285,8 +272,10 @@ def blackjack(deck, r_count, true_cnt):
             print('Please type hit or stay')
             continue
             
-    # Returning the results of the game        
-    return [wins, loss, draw, r_count, true_cnt]
+    # Returning the results of the game
+    global running_count, true_count
+    return [wins, loss, draw, running_count, true_count]
+
 
 def play_blackjack():
     """
