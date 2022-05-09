@@ -209,7 +209,11 @@ def blackjack(deck, r_count, true_cnt):
     # Tallying wins, losses, and draws
     wins = 0
     draw = 0
-    loss = 0
+    losses = 0
+    blackjacks = 0
+    double_wins = 0
+    double_losses = 0
+    surrenders = 0
     
     # Card Counting
     update_count(your_hand, deck, number=2, print=True)
@@ -228,6 +232,7 @@ def blackjack(deck, r_count, true_cnt):
             
             print("Congratulations! Blackjack!")
             wins += 1
+            blackjacks += 1
             break
         
         # Checking if the player and the dealer tie if they both have natural blackjacks
@@ -249,7 +254,7 @@ def blackjack(deck, r_count, true_cnt):
             if bust:
                 player_print(your_hand, total)
                 print("Dealer wins. You lose.")
-                loss += 1
+                losses += 1
                 break
         elif move == "stay" or move == "s":
             total = hand_total(your_hand)
@@ -263,7 +268,7 @@ def blackjack(deck, r_count, true_cnt):
             
             # The results of the dealer's turn
             wins += result[0]
-            loss += result[1]
+            losses += result[1]
             draw += result[2]
             break
                 
@@ -274,8 +279,20 @@ def blackjack(deck, r_count, true_cnt):
             
     # Returning the results of the game
     global running_count, true_count
-    return [wins, loss, draw, running_count, true_count]
+    return [wins, losses, draw, running_count, true_count, blackjacks]
 
+def choose_bet(retry=False):
+    if retry:
+        bet = input("Your bet must be a positive integer!")
+    bet = input("How much do you want to bet?")
+    try:
+        betfinal = int(bet)
+        if betfinal > 0:
+            return betfinal
+        else:
+            return choose_bet(True)
+    except:
+        return choose_bet(True)
 
 def play_blackjack():
     """
@@ -284,19 +301,22 @@ def play_blackjack():
     deck = create_deck(6)
     
     play = True
+    bankroll = 1000
     wins = 0
     rounds_played = 0
     r_count = 0
     true_cnt = 0
     
     while play:
-        
+        print("Bankroll:", bankroll)
+        bet = choose_bet()
         # Running blackjack
         game = blackjack(deck, r_count, true_cnt)
         
-        # Recording the results: wins, loss, draw
+        # Recording the results: wins, losses, draw
         wins += game[0]
         rounds_played += sum(game[:3])
+        bankroll += bet * game[0] - bet * game[1] + 0.5 * bet * game[5]
         
         r_count = game[3]
         true_cnt = game[4]
@@ -308,5 +328,7 @@ def play_blackjack():
             print("Not enough cards left. Game over.")
             break
         play = play_again()
-        
-play_blackjack()
+    print("Your final bankroll was", bankroll)
+
+if __name__=="__main__":
+    play_blackjack()
